@@ -110,7 +110,6 @@ def main():
     history = model.fit(train_data, train_labels, epochs=20, batch_size=128, verbose=0)
     time_end = time()
 
-    print(history.history.keys())
     print(get_metrics(history))
 
     result = model.evaluate(test_data, test_labels)
