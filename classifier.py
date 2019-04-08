@@ -85,7 +85,19 @@ def get_metrics(history):
     return sensitivity, specificity
 
 
-if __name__ == '__main__':
+def get_result_metrics(result):
+    tp = result[1]
+    fn = result[2]
+    tn = result[3]
+    fp = result[4]
+
+    sensitivity = tp / (tp + fn)
+    specificity = tn / (tn + fp)
+
+    return sensitivity, specificity
+
+
+def main():
     data = get_data('data.csv')
     print(describe_data(data))
 
@@ -101,6 +113,12 @@ if __name__ == '__main__':
     print(history.history.keys())
     print(get_metrics(history))
 
-    results = model.evaluate(test_data, test_labels)
-    print(results)
+    result = model.evaluate(test_data, test_labels)
+    sensitivity, specificity = get_result_metrics(result)
+    print(sensitivity)
+    print(specificity)
     print(time_end - time_start)
+
+
+if __name__ == '__main__':
+    main()
