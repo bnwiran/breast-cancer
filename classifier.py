@@ -4,7 +4,7 @@ from keras import models, optimizers, losses
 from keras import layers
 from time import time
 import keras_metrics as km
-import os
+from sklearn.model_selection import StratifiedKFold
 
 
 def get_data(filename):
@@ -33,6 +33,7 @@ def normalize(X):
 
 
 def split_data(data, test_size=0.2):
+    np.random.shuffle(data)
     features_count = data.shape[1]
 
     data_benign = data[data[:, -1] == 0]
@@ -103,20 +104,32 @@ def get_result_metrics(result):
     sensitivity = tp / (tp + fn)
     specificity = tn / (tn + fp)
 
-    return sensitivity, specificity
+    return sensitivity, specificity, tp, fn, tn, fp
 
 
-def do_experiment(data, nodes=(2048, 2048)):
+def create_and_train_model(nodes, train_data, train_labels, epochs=100, batch_size=64):
+    kfold = StratifiedKFold(n_splits=10, shuffle=True)
+
+    for train, val in kfold.split(train_data, train_labels):
+        model = create_model(nodes)
+        history = model.fit(train_data[train], train_labels[train], epochs=epochs, batch_size=batch_size, verbose=0)
+
+        result = model.evaluate(train_data[val], train_labels[val], verbose=0)
+
+    print(get_result_metrics(result))
+
+    return model, history
+
+
+def do_experiment(data, nodes=(128, 64, 64, 64)):
     data = preprocess_data(data)
     (train_data, train_labels), (test_data, test_labels) = split_data(data)
 
-    model = create_model(nodes)
-
     time_start = time()
-    history = model.fit(train_data, train_labels, epochs=20, batch_size=64, verbose=0)
+    model, history = create_and_train_model(nodes, train_data, train_labels)
     time_end = time()
 
-    result = model.evaluate(test_data, test_labels)
+    result = model.evaluate(test_data, test_labels, verbose=0)
 
     experiment_result = {}
     experiment_result['nodes'] = nodes
@@ -137,6 +150,10 @@ def print_experiment_result(result, file_name=None):
     evaluation_result = get_result_metrics(result['evaluation_result'])
     test_sensitivity = evaluation_result[0]
     test_specificity = evaluation_result[1]
+    TP = evaluation_result[2]
+    FN = evaluation_result[3]
+    TN = evaluation_result[4]
+    FP = evaluation_result[5]
     training_time = result['training_time']
 
     print('Number of hidden layers: {}'.format(len(nodes)))
@@ -144,7 +161,7 @@ def print_experiment_result(result, file_name=None):
     print('Training time: {:.2f} secs'.format(training_time))
     print('Test Training Metrics: Sensitivity: {:.2f}%, Specificity: {:.2f}%'.format(100 * training_sensitivity,
                                                                                      100 * training_specificity))
-    print('Test Evaluation Metrics: Sensitivity: {:.2f}%, Specificity: {:.2f}%'.format(100 * test_sensitivity,
+    print('Test Evaluation Metrics: TP: {}, FN: {}, TN: {}, FP: {}, Sensitivity: {:.2f}%, Specificity: {:.2f}%'.format(TP, FN, TN, FP, 100 * test_sensitivity,
                                                                                        100 * test_specificity))
     print('Training Sensitivity: {}'.format(training_sensitivity_history))
     print('Training Specificity: {}'.format(training_sensitivity_history))
@@ -160,9 +177,10 @@ def print_experiment_result(result, file_name=None):
 
 def main():
     data = get_data('data.csv')
-    result = do_experiment(data, nodes=(512, 512))
+    result = do_experiment(data)
     print_experiment_result(result, file_name='results.csv')
 
 
 if __name__ == '__main__':
+    np.random.seed(125)
     main()
