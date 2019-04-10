@@ -121,7 +121,7 @@ def create_and_train_model(nodes, train_data, train_labels, epochs=100, batch_si
     return model, history
 
 
-def do_experiment(data, nodes=(128, 64, 64, 64)):
+def do_experiment(data, nodes=(32, 32)):
     data = preprocess_data(data)
     (train_data, train_labels), (test_data, test_labels) = split_data(data)
 
@@ -177,7 +177,7 @@ def print_experiment_result(result, file_name=None):
 
 def main():
     data = get_data('data.csv')
-    result = do_experiment(data)
+    result = do_experiment(data, nodes=(32, 16))
     print_experiment_result(result, file_name='results.csv')
 
 
