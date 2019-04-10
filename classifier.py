@@ -33,12 +33,19 @@ def normalize(X):
 
 
 def split_data(data, test_size=0.2):
-    m = data.shape[0]
     features_count = data.shape[1]
-    test_instances_count = int(test_size * m)
 
-    test_data = data[:test_instances_count]
-    train_data = data[test_instances_count:]
+    data_benign = data[data[:, -1] == 0]
+    data_malignant = data[data[:, -1] == 1]
+
+    benign_test_instances_count = int(test_size * data_benign.shape[0])
+    malignant_test_instances_count = int(test_size * data_malignant.shape[0])
+
+    test_data = np.concatenate((data_benign[:benign_test_instances_count], data_malignant[:malignant_test_instances_count]), axis=0)
+    train_data = np.concatenate((data_benign[benign_test_instances_count:], data_malignant[malignant_test_instances_count:]), axis=0)
+
+    np.random.shuffle(test_data)
+    np.random.shuffle(train_data)
 
     train_data_X = train_data[:, 0:features_count - 1]
     train_data_Y = train_data[:, -1]
