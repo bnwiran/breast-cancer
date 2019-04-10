@@ -30,3 +30,10 @@ for train, test in kfold.split(X, Y):
     print("%s: %.2f%%" % (model.metrics_names[1], scores[1] * 100))
     cvscores.append(scores[1] * 100)
 print("%.2f%% (+/- %.2f%%)" % (numpy.mean(cvscores), numpy.std(cvscores)))
+
+
+from keras.datasets import mnist
+from keras.datasets import imdb
+
+(x_train, y_train), (x_test, y_test) = imdb.load_data()
+print (len(x_test) / len(x_train))

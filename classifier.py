@@ -1,15 +1,14 @@
 import numpy as np
 import pandas as pd
-from keras import models, optimizers, losses, metrics
+from keras import models, optimizers, losses
 from keras import layers
 from time import time
 import keras_metrics as km
+import os
 
 
 def get_data(filename):
     data = pd.read_csv(filename)
-    data = data.drop('id', axis=1)
-    data['diagnosis'] = data['diagnosis'].map({'B': 0, 'M': 1})
 
     return data
 
@@ -33,22 +32,25 @@ def normalize(X):
     return X
 
 
-def split_data(data, test_size=0.1):
+def split_data(data, test_size=0.2):
     m = data.shape[0]
     features_count = data.shape[1]
     test_instances_count = int(test_size * m)
+
     test_data = data[:test_instances_count]
     train_data = data[test_instances_count:]
 
     train_data_X = train_data[:, 0:features_count - 1]
-    train_data_Y = train_data[:, features_count - 1:features_count]
+    train_data_Y = train_data[:, -1]
     test_data_X = test_data[:, 0:features_count - 1]
-    test_data_Y = test_data[:, features_count - 1:features_count]
+    test_data_Y = test_data[:, -1]
 
     return (train_data_X, train_data_Y), (test_data_X, test_data_Y)
 
 
 def preprocess_data(data):
+    data = data.drop('id', axis=1)
+    data['diagnosis'] = data['diagnosis'].map({'B': 0, 'M': 1})
     m = data.shape[0]
 
     X = normalize(data.iloc[:, 1:].values)
@@ -57,7 +59,7 @@ def preprocess_data(data):
     return np.concatenate((X, Y), axis=1)
 
 
-def create_model(nodes=(2048, 2048)):
+def create_model(nodes):
     model = models.Sequential()
 
     model.add(layers.Dense(nodes[0], activation='relu', input_shape=(30,)))
@@ -66,7 +68,7 @@ def create_model(nodes=(2048, 2048)):
 
     model.add(layers.Dense(1, activation='sigmoid'))
 
-    model.compile(optimizer='rmsprop', loss=losses.binary_crossentropy,
+    model.compile(optimizer=optimizers.RMSprop(), loss=losses.binary_crossentropy,
                   metrics=[km.binary_true_positive(), km.binary_false_negative(),
                            km.binary_true_negative(), km.binary_false_positive()])
 
@@ -97,26 +99,62 @@ def get_result_metrics(result):
     return sensitivity, specificity
 
 
-def main():
-    data = get_data('data.csv')
-    print(describe_data(data))
-
+def do_experiment(data, nodes=(2048, 2048)):
     data = preprocess_data(data)
     (train_data, train_labels), (test_data, test_labels) = split_data(data)
 
-    model = create_model()
+    model = create_model(nodes)
 
     time_start = time()
-    history = model.fit(train_data, train_labels, epochs=20, batch_size=128, verbose=0)
+    history = model.fit(train_data, train_labels, epochs=20, batch_size=64, verbose=0)
     time_end = time()
 
-    print(get_metrics(history))
-
     result = model.evaluate(test_data, test_labels)
-    sensitivity, specificity = get_result_metrics(result)
-    print(sensitivity)
-    print(specificity)
-    print(time_end - time_start)
+
+    experiment_result = {}
+    experiment_result['nodes'] = nodes
+    experiment_result['training_time'] = (time_end - time_start)
+    experiment_result['training_history'] = history
+    experiment_result['evaluation_result'] = result
+
+    return experiment_result
+
+
+def print_experiment_result(result, file_name=None):
+    nodes = result['nodes']
+    training_history = get_metrics(result['training_history'])
+    training_sensitivity_history = training_history[0]
+    training_specificity_history = training_history[1]
+    training_sensitivity = training_sensitivity_history[-1]
+    training_specificity = training_specificity_history[-1]
+    evaluation_result = get_result_metrics(result['evaluation_result'])
+    test_sensitivity = evaluation_result[0]
+    test_specificity = evaluation_result[1]
+    training_time = result['training_time']
+
+    print('Number of hidden layers: {}'.format(len(nodes)))
+    print('Number of nodes in each layer: {}'.format(nodes))
+    print('Training time: {:.2f} secs'.format(training_time))
+    print('Test Training Metrics: Sensitivity: {:.2f}%, Specificity: {:.2f}%'.format(100 * training_sensitivity,
+                                                                                     100 * training_specificity))
+    print('Test Evaluation Metrics: Sensitivity: {:.2f}%, Specificity: {:.2f}%'.format(100 * test_sensitivity,
+                                                                                       100 * test_specificity))
+    print('Training Sensitivity: {}'.format(training_sensitivity_history))
+    print('Training Specificity: {}'.format(training_sensitivity_history))
+
+    format_str = '\n{};{};{:.4f};{:.4f};{:.4f};{:.4f};{:.4f};{};{}'
+
+    if file_name:
+        with open(file_name, 'a') as f:
+            f.write(format_str.format(len(nodes), nodes, training_time, test_sensitivity, test_specificity,
+                                      training_sensitivity, training_specificity, training_sensitivity_history,
+                                      training_specificity_history))
+
+
+def main():
+    data = get_data('data.csv')
+    result = do_experiment(data, nodes=(512, 512))
+    print_experiment_result(result, file_name='results.csv')
 
 
 if __name__ == '__main__':
