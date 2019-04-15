@@ -8,9 +8,7 @@ from sklearn.model_selection import StratifiedKFold
 
 
 def get_data(filename):
-    data = pd.read_csv(filename)
-
-    return data
+    return pd.read_csv(filename)
 
 
 def describe_data(data):
